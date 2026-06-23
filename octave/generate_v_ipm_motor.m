@@ -29,26 +29,6 @@ for i = 1:size(bh_core,1)
     mi_addbhpoint('SiSteel', bh_core(i,2), bh_core(i,1));
 end
 
-% SmCo17 Grade 17 자석 재료 정의
-mi_addmaterial('SmCo17_Grade17', 1.0, 1.05, 0, -750e3, 6.7e5);
-bh_data = [
-    0,      0.0;
-    20e3,   0.10;
-    100e3,  0.30;
-    300e3,  0.60;
-    500e3,  0.78;
-    650e3,  0.87;
-    750e3,  0.95;
-    850e3,  1.00;
-    950e3,  1.03;
-    1100e3, 1.05;
-    1300e3, 1.07;
-    1500e3, 1.08
-];
-for i = 1:size(bh_data,1)
-    mi_addbhpoint('SmCo17_Grade17', bh_data(i,2), bh_data(i,1));
-end
-
 % Inconel 718 material 정의
 mi_addmaterial('Inconel 718', ...
     1.02, ...
@@ -66,7 +46,7 @@ mi_addmaterial('Inconel 718', ...
     0);
 
 % 재료 정의
-PM = 'SmCo17_Grade17';
+PM = 'NdFeB 40 MGOe';
 Core = 'SiSteel';
 Sealing = 'Inconel 718';
 Coil = '18 AWG';
@@ -74,6 +54,7 @@ Coilname = {'Coil_A','Coil_B','Coil_C'};
 
 % 재료 로딩
 mi_getmaterial('Air');
+mi_getmaterial(PM);
 mi_getmaterial(Coil);
 
 % 파라미터
