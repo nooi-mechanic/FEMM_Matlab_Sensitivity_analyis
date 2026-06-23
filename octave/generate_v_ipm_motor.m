@@ -1,156 +1,170 @@
-%% ========================= FEMM V-IPM Modeling ==========================
-clc, clear
+%% generate_v_ipm_motor.m - FEMM V-IPM 모델 생성 및 저장
+% 스테이터/권선은 기존 SPM 코드 흐름을 유지하고, 로터부만 V형 IPM으로 변경
 
-% Material definitions
+openfemm(1);
+newdocument(0);
+depth = 150;
+mi_probdef(0,'millimeters','planar',1E-8,depth,30,0);
+
+% 규소강판(Silicon Steel) 코어 재료 정의
+mi_addmaterial('SiSteel', 4000, 4000, 0, 1.8e6, 0.0, 0.35, 1.5, 0.95, 0, 0, 0, 0, 0);
+bh_core = [
+    0, 0;
+    100, 0.005;
+    500, 0.05;
+    1000, 0.15;
+    2000, 0.30;
+    3000, 0.45;
+    5000, 0.70;
+    8000, 1.00;
+    12000, 1.25;
+    16000, 1.40;
+    20000, 1.45;
+    25000, 1.47;
+    30000, 1.48;
+    35000, 1.49;
+    40000, 1.50
+];
+for i = 1:size(bh_core,1)
+    mi_addbhpoint('SiSteel', bh_core(i,2), bh_core(i,1));
+end
+
+% SmCo17 Grade 17 자석 재료 정의
+mi_addmaterial('SmCo17_Grade17', 1.0, 1.05, 0, -750e3, 6.7e5);
+bh_data = [
+    0,      0.0;
+    20e3,   0.10;
+    100e3,  0.30;
+    300e3,  0.60;
+    500e3,  0.78;
+    650e3,  0.87;
+    750e3,  0.95;
+    850e3,  1.00;
+    950e3,  1.03;
+    1100e3, 1.05;
+    1300e3, 1.07;
+    1500e3, 1.08
+];
+for i = 1:size(bh_data,1)
+    mi_addbhpoint('SmCo17_Grade17', bh_data(i,2), bh_data(i,1));
+end
+
+% Inconel 718 material 정의
+mi_addmaterial('Inconel 718', ...
+    1.02, ...
+    1.02, ...
+    0, ...
+    0, ...
+    0.8, ...
+    0, ...
+    0, ...
+    1, ...
+    0, ...
+    0, ...
+    0, ...
+    1, ...
+    0);
+
+% 재료 정의
 PM = 'SmCo17_Grade17';
 Core = 'SiSteel';
+Sealing = 'Inconel 718';
 Coil = '18 AWG';
 Coilname = {'Coil_A','Coil_B','Coil_C'};
 
-% Geometry parameters from the provided specification (mm)
-stack_length = 110;
-stator_outer_radius = 300 / 2;
-rotor_outer_radius = 154 / 2;
-airgap_length = 1.0;
-stator_inner_radius = rotor_outer_radius + airgap_length;
+% 재료 로딩
+mi_getmaterial('Air');
+mi_getmaterial(Coil);
 
-shaft_radius = 28;
-turns = 40;
+% 파라미터
+PM_r = 53/2;
+Seal = 5;
+Core_ri = 64/2;
+Core_ro = 150/2;
+Slot_l = 20;
+turns = 200;
 max_segment = 10;
+Core_angle = 5;
+num_slots = 36;
+Teeth_angle = pi/66.95;
+Teeth_length = 1;
+Teeth_length2 = 1;
+Arc_offset = 0.01*pi;
 
-% 4-pole / 3-slot stator parameters
-num_slots = 3;
-slot_pitch_deg = 360 / num_slots;
-tooth_arc_deg = 55;
-slot_arc_deg = slot_pitch_deg - tooth_arc_deg;
-slot_depth = 32;
-slot_outer_radius = stator_inner_radius + slot_depth;
-slot_label_radius = stator_inner_radius + slot_depth * 0.55;
+% V형 IPM 로터 파라미터
+shaft_r = 12;
+magnet_length = 18;
+magnet_thickness = 4;
+v_angle_deg = 30;
+magnet_center_r = PM_r - 6;
+magnet_center_offset_deg = 18;
 
-% V-shaped IPM rotor parameters
-magnet_length = 26;
-magnet_thickness = 8;
-v_angle_deg = 28;
-magnet_center_radius = rotor_outer_radius - 18;
-magnet_center_offset_deg = 10;
-
-% Output folder
+% 출력 폴더
 output_dir = fullfile(pwd, 'femm_output_v_ipm');
 if ~exist(output_dir, 'dir')
     mkdir(output_dir);
 end
 
-% FEMM setting
-openfemm(1);
-newdocument(0);
-mi_probdef(0,'millimeters','planar',1E-8,stack_length,30,0);
+%% 회전자 (V-IPM)
+% 로터 외곽
+mi_drawarc(PM_r+Seal,0,-PM_r-Seal,0,180,max_segment);
+mi_drawarc(-PM_r-Seal,0,PM_r+Seal,0,180,max_segment);
 
-% Core material
-mi_addmaterial(Core, 4000, 4000, 0, 1.8e6, 0.0, 0.35, 1.5, 0.95, 0, 0, 0, 0, 0);
-core_bh = [
-  0,     0.000;
-  100,   0.005;
-  500,   0.050;
-  1000,  0.150;
-  2000,  0.300;
-  3000,  0.450;
-  5000,  0.700;
-  8000,  1.000;
-  12000, 1.250;
-  16000, 1.400;
-  20000, 1.450;
-  25000, 1.470;
-  30000, 1.480;
-  35000, 1.490;
-  40000, 1.500
-];
-for idx = 1:size(core_bh, 1)
-    mi_addbhpoint(Core, core_bh(idx,2), core_bh(idx,1));
-end
+% 샤프트
+mi_drawarc(shaft_r,0,-shaft_r,0,180,max_segment);
+mi_addarc(-shaft_r,0,shaft_r,0,180,max_segment);
 
-% Magnet material
-mi_addmaterial(PM, 1.0, 1.05, 0, -750e3, 6.7e5);
-pm_bh = [
-  0,       0.00;
-  20e3,    0.10;
-  100e3,   0.30;
-  300e3,   0.60;
-  500e3,   0.78;
-  650e3,   0.87;
-  750e3,   0.95;
-  850e3,   1.00;
-  950e3,   1.03;
-  1100e3,  1.05;
-  1300e3,  1.07;
-  1500e3,  1.08
-];
-for idx = 1:size(pm_bh, 1)
-    mi_addbhpoint(PM, pm_bh(idx,2), pm_bh(idx,1));
-end
-
-% Get materials
-mi_getmaterial('Air');
-mi_getmaterial(Coil);
-
-% Rotor outer boundary
-mi_drawarc(rotor_outer_radius,0,-rotor_outer_radius,0,180,max_segment);
-mi_addarc(-rotor_outer_radius,0,rotor_outer_radius,0,180,max_segment);
-
-% Shaft opening
-mi_drawarc(shaft_radius,0,-shaft_radius,0,180,max_segment);
-mi_addarc(-shaft_radius,0,shaft_radius,0,180,max_segment);
-
-% V-type magnet cavities and labels
+% V형 자석 4개 배치
 magnet_specs = [
-  90 + magnet_center_offset_deg,  magnet_center_radius,  90 + v_angle_deg,  90 + v_angle_deg;
-  90 - magnet_center_offset_deg,  magnet_center_radius,  90 - v_angle_deg,  90 - v_angle_deg;
-  270 - magnet_center_offset_deg, magnet_center_radius, 270 - v_angle_deg, 270 - v_angle_deg;
-  270 + magnet_center_offset_deg, magnet_center_radius, 270 + v_angle_deg, 270 + v_angle_deg
+    90 + magnet_center_offset_deg,  magnet_center_r,  90 + v_angle_deg,  90 + v_angle_deg;
+    90 - magnet_center_offset_deg,  magnet_center_r,  90 - v_angle_deg,  90 - v_angle_deg;
+    270 - magnet_center_offset_deg, magnet_center_r, 270 - v_angle_deg, 270 - v_angle_deg;
+    270 + magnet_center_offset_deg, magnet_center_r, 270 + v_angle_deg, 270 + v_angle_deg
 ];
 
-for magnet_idx = 1:size(magnet_specs,1)
-    center_angle_deg = magnet_specs(magnet_idx,1);
-    center_radius = magnet_specs(magnet_idx,2);
-    body_angle_deg = magnet_specs(magnet_idx,3);
-    magnetization_deg = magnet_specs(magnet_idx,4);
+for i = 1:size(magnet_specs,1)
+    center_angle_deg = magnet_specs(i,1);
+    center_r = magnet_specs(i,2);
+    body_angle_deg = magnet_specs(i,3);
+    magnetization_deg = magnet_specs(i,4);
 
     angle_rad = deg2rad(center_angle_deg);
     body_rad = deg2rad(body_angle_deg);
 
-    center_x = center_radius * cos(angle_rad);
-    center_y = center_radius * sin(angle_rad);
+    cx = center_r*cos(angle_rad);
+    cy = center_r*sin(angle_rad);
 
     along_x = cos(body_rad);
     along_y = sin(body_rad);
     normal_x = -sin(body_rad);
     normal_y = cos(body_rad);
 
-    half_length = magnet_length / 2;
-    half_thickness = magnet_thickness / 2;
+    half_length = magnet_length/2;
+    half_thickness = magnet_thickness/2;
 
-    p1x = center_x + along_x * half_length + normal_x * half_thickness;
-    p1y = center_y + along_y * half_length + normal_y * half_thickness;
-    p2x = center_x + along_x * half_length - normal_x * half_thickness;
-    p2y = center_y + along_y * half_length - normal_y * half_thickness;
-    p3x = center_x - along_x * half_length - normal_x * half_thickness;
-    p3y = center_y - along_y * half_length - normal_y * half_thickness;
-    p4x = center_x - along_x * half_length + normal_x * half_thickness;
-    p4y = center_y - along_y * half_length + normal_y * half_thickness;
+    p1x = cx + along_x*half_length + normal_x*half_thickness;
+    p1y = cy + along_y*half_length + normal_y*half_thickness;
+    p2x = cx + along_x*half_length - normal_x*half_thickness;
+    p2y = cy + along_y*half_length - normal_y*half_thickness;
+    p3x = cx - along_x*half_length - normal_x*half_thickness;
+    p3y = cy - along_y*half_length - normal_y*half_thickness;
+    p4x = cx - along_x*half_length + normal_x*half_thickness;
+    p4y = cy - along_y*half_length + normal_y*half_thickness;
 
     mi_drawline(p1x,p1y,p2x,p2y);
     mi_drawline(p2x,p2y,p3x,p3y);
     mi_drawline(p3x,p3y,p4x,p4y);
     mi_drawline(p4x,p4y,p1x,p1y);
 
-    mi_addblocklabel(center_x,center_y);
-    mi_selectlabel(center_x,center_y);
+    mi_addblocklabel(cx,cy);
+    mi_selectlabel(cx,cy);
     mi_setblockprop(PM,1,0,0,magnetization_deg,1,0);
     mi_clearselected;
 end
 
-% Rotor steel and shaft labels
-mi_addblocklabel(0,shaft_radius + 8);
-mi_selectlabel(0,shaft_radius + 8);
+% 로터 철심 및 샤프트 공기 라벨
+mi_addblocklabel(0,shaft_r+5);
+mi_selectlabel(0,shaft_r+5);
 mi_setblockprop(Core,1,0,0,0,1,0);
 mi_clearselected;
 
@@ -159,75 +173,90 @@ mi_selectlabel(0,0);
 mi_setblockprop('Air',1,0,0,0,1,0);
 mi_clearselected;
 
-% Stator outer boundary
-mi_drawarc(stator_outer_radius,0,-stator_outer_radius,0,180,max_segment);
-mi_addarc(-stator_outer_radius,0,stator_outer_radius,0,180,max_segment);
+%% 고정자 외곽
+mi_drawarc(Core_ro,0,-Core_ro,0,180,max_segment);
+mi_addarc(-Core_ro,0,Core_ro,0,180,max_segment);
 
-% 4p3s stator: draw 3 slot windows directly to avoid broken self-intersections.
-for slot_idx = 0:(num_slots - 1)
-    slot_center_deg = slot_idx * slot_pitch_deg;
-    slot_start_deg = slot_center_deg - slot_arc_deg / 2;
-    slot_end_deg = slot_center_deg + slot_arc_deg / 2;
-    tooth_start_deg = slot_end_deg;
-    tooth_end_deg = slot_start_deg + slot_pitch_deg;
-
-    slot_start_rad = deg2rad(slot_start_deg);
-    slot_end_rad = deg2rad(slot_end_deg);
-    tooth_start_rad = deg2rad(tooth_start_deg);
-    tooth_end_rad = deg2rad(tooth_end_deg);
-
-    slot_inner_start_x = stator_inner_radius * cos(slot_start_rad);
-    slot_inner_start_y = stator_inner_radius * sin(slot_start_rad);
-    slot_inner_end_x = stator_inner_radius * cos(slot_end_rad);
-    slot_inner_end_y = stator_inner_radius * sin(slot_end_rad);
-    slot_outer_start_x = slot_outer_radius * cos(slot_start_rad);
-    slot_outer_start_y = slot_outer_radius * sin(slot_start_rad);
-    slot_outer_end_x = slot_outer_radius * cos(slot_end_rad);
-    slot_outer_end_y = slot_outer_radius * sin(slot_end_rad);
-
-    mi_drawline(slot_inner_start_x,slot_inner_start_y,slot_outer_start_x,slot_outer_start_y);
-    mi_drawline(slot_inner_end_x,slot_inner_end_y,slot_outer_end_x,slot_outer_end_y);
-    mi_drawarc(slot_outer_start_x,slot_outer_start_y,slot_outer_end_x,slot_outer_end_y,slot_arc_deg,max_segment);
-
-    tooth_start_x = stator_inner_radius * cos(tooth_start_rad);
-    tooth_start_y = stator_inner_radius * sin(tooth_start_rad);
-    tooth_end_x = stator_inner_radius * cos(tooth_end_rad);
-    tooth_end_y = stator_inner_radius * sin(tooth_end_rad);
-    mi_drawarc(tooth_start_x,tooth_start_y,tooth_end_x,tooth_end_y,tooth_arc_deg,max_segment);
-
-    slot_label_angle = deg2rad(slot_center_deg);
-    slot_label_x = slot_label_radius * cos(slot_label_angle);
-    slot_label_y = slot_label_radius * sin(slot_label_angle);
-    mi_addblocklabel(slot_label_x,slot_label_y);
-    mi_selectlabel(slot_label_x,slot_label_y);
-    mi_setblockprop(Coil,1,0,Coilname{slot_idx + 1},0,2,turns);
-    mi_clearselected;
+%% 슬롯 및 이(Teeth)
+for i = 0:num_slots
+    h = (i-1)*2*pi/180;
+    j = i*2*pi/180;
+    k = (i+1)*2*pi/180;
+    L = (i+2)*2*pi/180;
+    if mod(i,2) == 1
+        mi_drawarc(Core_ri*cos(h*Core_angle-Teeth_angle),Core_ri*sin(h*Core_angle-Teeth_angle),Core_ri*cos(j*Core_angle+Teeth_angle),Core_ri*sin(j*Core_angle+Teeth_angle),Core_angle+Teeth_angle*2,max_segment);
+        mi_drawline(Core_ri*cos(h*Core_angle-Teeth_angle),Core_ri*sin(h*Core_angle-Teeth_angle),(Core_ri+Teeth_length)*cos(h*Core_angle-Teeth_angle),(Core_ri+Teeth_length)*sin(h*Core_angle-Teeth_angle));
+        mi_drawline(Core_ri*cos(j*Core_angle+Teeth_angle),Core_ri*sin(j*Core_angle+Teeth_angle),(Core_ri+Teeth_length)*cos(j*Core_angle+Teeth_angle),(Core_ri+Teeth_length)*sin(j*Core_angle+Teeth_angle));
+        mi_drawline((Core_ri+Teeth_length)*cos(h*Core_angle-Teeth_angle),(Core_ri+Teeth_length)*sin(h*Core_angle-Teeth_angle),(Core_ri+Teeth_length+Teeth_length2)*cos(h*Core_angle),(Core_ri+Teeth_length+Teeth_length2)*sin(h*Core_angle));
+        mi_drawline((Core_ri+Teeth_length)*cos(j*Core_angle+Teeth_angle),(Core_ri+Teeth_length)*sin(j*Core_angle+Teeth_angle),(Core_ri+Teeth_length+Teeth_length2)*cos(j*Core_angle),(Core_ri+Teeth_length+Teeth_length2)*sin(j*Core_angle));
+        mi_drawline((Core_ri+Teeth_length+Teeth_length2)*cos(j*Core_angle),(Core_ri+Teeth_length+Teeth_length2)*sin(j*Core_angle),(Core_ri+Teeth_length+Teeth_length2+Slot_l)*cos(j*Core_angle-Arc_offset),(Core_ri+Teeth_length+Teeth_length2+Slot_l)*sin(j*Core_angle-Arc_offset));
+    else
+        mi_drawarc((Core_ri+Teeth_length+Teeth_length2+Slot_l)*cos(k*Core_angle-Arc_offset),(Core_ri+Teeth_length+Teeth_length2+Slot_l)*sin(k*Core_angle-Arc_offset),(Core_ri+Teeth_length+Teeth_length2+Slot_l)*cos(L*Core_angle+Arc_offset),(Core_ri+Teeth_length+Teeth_length2+Slot_l)*sin(L*Core_angle+Arc_offset),180,max_segment);
+        mi_drawarc(Core_ri*cos(h*Core_angle+Teeth_angle),Core_ri*sin(h*Core_angle+Teeth_angle),Core_ri*cos(j*Core_angle-Teeth_angle),Core_ri*sin(j*Core_angle-Teeth_angle),Core_angle-Teeth_angle*2,max_segment);
+        mi_drawline((Core_ri+Teeth_length+Teeth_length2)*cos(j*Core_angle),(Core_ri+Teeth_length+Teeth_length2)*sin(j*Core_angle),(Core_ri+Teeth_length+Teeth_length2+Slot_l)*cos(j*Core_angle+Arc_offset),(Core_ri+Teeth_length+Teeth_length2+Slot_l)*sin(j*Core_angle+Arc_offset));
+    end
 end
 
-% Stator and air labels
-mi_addblocklabel(stator_outer_radius - 2,0);
-mi_selectlabel(stator_outer_radius - 2,0);
+% 고정자 코어 블록
+mi_addblocklabel(Core_ro-0.1,0);
+mi_selectlabel(Core_ro-0.1,0);
 mi_setblockprop(Core,1,0,0,0,2,0);
 mi_clearselected;
 
-mi_addblocklabel((rotor_outer_radius + stator_inner_radius)/2,0);
-mi_selectlabel((rotor_outer_radius + stator_inner_radius)/2,0);
+% 에어갭 및 외부 공기
+mi_addblocklabel((PM_r+Seal+Core_ri)/2,0);
+mi_selectlabel((PM_r+Seal+Core_ri)/2,0);
+mi_setblockprop('Air',1,0,0,0,2,0);
+mi_clearselected;
+mi_addblocklabel(PM_r*5,0);
+mi_selectlabel(PM_r*5,0);
 mi_setblockprop('Air',1,0,0,0,2,0);
 mi_clearselected;
 
-mi_addblocklabel(stator_outer_radius + 10,0);
-mi_selectlabel(stator_outer_radius + 10,0);
-mi_setblockprop('Air',1,0,0,0,2,0);
-mi_clearselected;
+%% Coil Winding
+for i = 1:3
+    h = (i-1)*2*pi/180;
+    j = i*2*pi/180;
+    k = (i+1)*2*pi/180;
 
-% Commutation-ready circuit properties for A/B/C phases.
-for phase_idx = 1:numel(Coilname)
-    mi_addcircprop(Coilname{phase_idx},0,1);
+    mi_addcircprop(Coilname{i},0,1);
+
+    P = -3*pi/9;
+    mi_addblocklabel(((Core_ri+Teeth_length2+Slot_l)*cos((j+h)*Core_angle+P)+(Core_ri+Teeth_length2+Slot_l)*cos((k+h)*Core_angle+P))/2,((Core_ri+Teeth_length2+Slot_l)*sin((j+h)*Core_angle+P)+(Core_ri+Teeth_length2+Slot_l)*sin((k+h)*Core_angle+P))/2);
+    mi_selectlabel(((Core_ri+Teeth_length2+Slot_l)*cos((j+h)*Core_angle+P)+(Core_ri+Teeth_length2+Slot_l)*cos((k+h)*Core_angle+P))/2,((Core_ri+Teeth_length2+Slot_l)*sin((j+h)*Core_angle+P)+(Core_ri+Teeth_length2+Slot_l)*sin((k+h)*Core_angle+P))/2);
+    mi_setblockprop(Coil,1,0,Coilname{3},0,2,-turns);
+    mi_clearselected;
+
+    mi_addblocklabel(((Core_ri+Teeth_length2+Slot_l)*cos((j+h)*Core_angle)+(Core_ri+Teeth_length2+Slot_l)*cos((k+h)*Core_angle))/2,((Core_ri+Teeth_length2+Slot_l)*sin((j+h)*Core_angle)+(Core_ri+Teeth_length2+Slot_l)*sin((k+h)*Core_angle))/2);
+    mi_selectlabel(((Core_ri+Teeth_length2+Slot_l)*cos((j+h)*Core_angle)+(Core_ri+Teeth_length2+Slot_l)*cos((k+h)*Core_angle))/2,((Core_ri+Teeth_length2+Slot_l)*sin((j+h)*Core_angle)+(Core_ri+Teeth_length2+Slot_l)*sin((k+h)*Core_angle))/2);
+    mi_setblockprop(Coil,1,0,Coilname{1},0,2,turns);
+    mi_clearselected;
+
+    P = 3*pi/9;
+    mi_addblocklabel(((Core_ri+Teeth_length2+Slot_l)*cos((j+h)*Core_angle+P)+(Core_ri+Teeth_length2+Slot_l)*cos((k+h)*Core_angle+P))/2,((Core_ri+Teeth_length2+Slot_l)*sin((j+h)*Core_angle+P)+(Core_ri+Teeth_length2+Slot_l)*sin((k+h)*Core_angle+P))/2);
+    mi_selectlabel(((Core_ri+Teeth_length2+Slot_l)*cos((j+h)*Core_angle+P)+(Core_ri+Teeth_length2+Slot_l)*cos((k+h)*Core_angle+P))/2,((Core_ri+Teeth_length2+Slot_l)*sin((j+h)*Core_angle+P)+(Core_ri+Teeth_length2+Slot_l)*sin((k+h)*Core_angle+P))/2);
+    mi_setblockprop(Coil,1,0,Coilname{2},0,2,turns);
+    mi_clearselected;
+
+    copy_angle = pi-P;
+    mi_addblocklabel(((Core_ri+Teeth_length2+Slot_l)*cos((j+h)*Core_angle+copy_angle)+(Core_ri+Teeth_length2+Slot_l)*cos((k+h)*Core_angle+copy_angle))/2,((Core_ri+Teeth_length2+Slot_l)*sin((j+h)*Core_angle+copy_angle)+(Core_ri+Teeth_length2+Slot_l)*sin((k+h)*Core_angle+copy_angle))/2);
+    mi_selectlabel(((Core_ri+Teeth_length2+Slot_l)*cos((j+h)*Core_angle+copy_angle)+(Core_ri+Teeth_length2+Slot_l)*cos((k+h)*Core_angle+copy_angle))/2,((Core_ri+Teeth_length2+Slot_l)*sin((j+h)*Core_angle+copy_angle)+(Core_ri+Teeth_length2+Slot_l)*sin((k+h)*Core_angle+copy_angle))/2);
+    mi_setblockprop(Coil,1,0,Coilname{3},0,2,turns);
+    mi_clearselected;
+
+    copy_angle = pi;
+    mi_addblocklabel(((Core_ri+Teeth_length2+Slot_l)*cos((j+h)*Core_angle+copy_angle)+(Core_ri+Teeth_length2+Slot_l)*cos((k+h)*Core_angle+copy_angle))/2,((Core_ri+Teeth_length2+Slot_l)*sin((j+h)*Core_angle+copy_angle)+(Core_ri+Teeth_length2+Slot_l)*sin((k+h)*Core_angle+copy_angle))/2);
+    mi_selectlabel(((Core_ri+Teeth_length2+Slot_l)*cos((j+h)*Core_angle+copy_angle)+(Core_ri+Teeth_length2+Slot_l)*cos((k+h)*Core_angle+copy_angle))/2,((Core_ri+Teeth_length2+Slot_l)*sin((j+h)*Core_angle+copy_angle)+(Core_ri+Teeth_length2+Slot_l)*sin((k+h)*Core_angle+copy_angle))/2);
+    mi_setblockprop(Coil,1,0,Coilname{1},0,2,-turns);
+    mi_clearselected;
+
+    copy_angle = pi+P;
+    mi_addblocklabel(((Core_ri+Teeth_length2+Slot_l)*cos((j+h)*Core_angle+copy_angle)+(Core_ri+Teeth_length2+Slot_l)*cos((k+h)*Core_angle+copy_angle))/2,((Core_ri+Teeth_length2+Slot_l)*sin((j+h)*Core_angle+copy_angle)+(Core_ri+Teeth_length2+Slot_l)*sin((k+h)*Core_angle+copy_angle))/2);
+    mi_selectlabel(((Core_ri+Teeth_length2+Slot_l)*cos((j+h)*Core_angle+copy_angle)+(Core_ri+Teeth_length2+Slot_l)*cos((k+h)*Core_angle+copy_angle))/2,((Core_ri+Teeth_length2+Slot_l)*sin((j+h)*Core_angle+copy_angle)+(Core_ri+Teeth_length2+Slot_l)*sin((k+h)*Core_angle+copy_angle))/2);
+    mi_setblockprop(Coil,1,0,Coilname{2},0,2,-turns);
+    mi_clearselected;
 end
 
-% Boundary and save
-mi_makeABC(7,stator_outer_radius * 1.2,0,0,0);
-filename = fullfile(output_dir, 'v_ipm_motor_4p3s.fem');
-mi_saveas(filename);
-
-% This file currently generates geometry only.
+% 경계조건 및 저장
+mi_makeABC(7,PM_r*20,0,0,0);
+mi_saveas(fullfile(output_dir,'v_ipm_motor.fem'));
