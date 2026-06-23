@@ -13,6 +13,11 @@
   - 권선과 공기영역, 경계조건을 설정하고
   - 최종적으로 `spm.fem` 파일로 저장합니다
 
+- `octave/generate_v_ipm_motor.m`
+  - 기존 스테이터와 에어갭 조건을 유지한 상태에서
+  - 로터만 V형 IPM(Interior Permanent Magnet) 구조로 생성하고
+  - 최종적으로 `v_ipm_motor.fem` 파일로 저장합니다
+
 ## 필요한 환경
 
 - [FEMM](https://www.femm.info/wiki/HomePage)
@@ -36,6 +41,12 @@
 run("octave/generate_spm_motor.m")
 ```
 
+V형 IPM 버전 예시:
+
+```octave
+run("octave/generate_v_ipm_motor.m")
+```
+
 ## 현재 코드가 하는 일
 
 - 문제 정의 단위를 `millimeters` 기준으로 설정
@@ -45,6 +56,7 @@ run("octave/generate_spm_motor.m")
 - 3상 권선 블록 라벨 배치
 - 외곽 공기영역 및 경계조건 설정
 - `spm.fem` 저장
+- `v_ipm_motor.fem` 저장
 
 ## 아직 포함되지 않은 내용
 
@@ -59,5 +71,6 @@ run("octave/generate_spm_motor.m")
 .
 ├── README.md
 └── octave
-    └── generate_spm_motor.m
+    ├── generate_spm_motor.m
+    └── generate_v_ipm_motor.m
 ```
