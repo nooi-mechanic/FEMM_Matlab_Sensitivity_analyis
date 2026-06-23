@@ -279,7 +279,7 @@ if run_theta_sweep
         opendocument(base_fem_filename);
 
         mi_selectgroup(1);
-        mi_moverotate2(0,0,theta_deg,4);
+        mi_moverotate(0,0,theta_deg,4);
         mi_clearselected;
 
         theta_elec_rad = deg2rad(pole_pairs * theta_deg);
