@@ -15,19 +15,17 @@ airgap_length = 1.0;
 stator_inner_radius = rotor_outer_radius + airgap_length;
 
 shaft_radius = 28;
-slot_length = 24;
-turns = 4;
+turns = 40;
 max_segment = 10;
-slot_pitch_deg = 5;
-num_slots = 36;
-tooth_half_angle = pi / 66.95;
-tooth_length_inner = 2.5;
-tooth_length_outer = 2.5;
-arc_offset = 0.01 * pi;
 
-tooth_tip_radius = stator_inner_radius + tooth_length_inner;
-tooth_shoulder_radius = tooth_tip_radius + tooth_length_outer;
-slot_outer_radius = tooth_shoulder_radius + slot_length;
+% 4-pole / 3-slot stator parameters
+num_slots = 3;
+slot_pitch_deg = 360 / num_slots;
+tooth_arc_deg = 55;
+slot_arc_deg = slot_pitch_deg - tooth_arc_deg;
+slot_depth = 32;
+slot_outer_radius = stator_inner_radius + slot_depth;
+slot_label_radius = stator_inner_radius + slot_depth * 0.55;
 
 % V-shaped IPM rotor parameters
 magnet_length = 26;
@@ -151,8 +149,8 @@ for magnet_idx = 1:size(magnet_specs,1)
 end
 
 % Rotor steel and shaft labels
-mi_addblocklabel(0,shaft_radius+8);
-mi_selectlabel(0,shaft_radius+8);
+mi_addblocklabel(0,shaft_radius + 8);
+mi_selectlabel(0,shaft_radius + 8);
 mi_setblockprop(Core,1,0,0,0,1,0);
 mi_clearselected;
 
@@ -165,53 +163,45 @@ mi_clearselected;
 mi_drawarc(stator_outer_radius,0,-stator_outer_radius,0,180,max_segment);
 mi_addarc(-stator_outer_radius,0,stator_outer_radius,0,180,max_segment);
 
-% Teeth and slot opening geometry
+% 4p3s stator: draw 3 slot windows directly to avoid broken self-intersections.
 for slot_idx = 0:(num_slots - 1)
-    prev_angle = deg2rad((slot_idx - 1) * slot_pitch_deg);
-    curr_angle = deg2rad(slot_idx * slot_pitch_deg);
-    next_angle = deg2rad((slot_idx + 1) * slot_pitch_deg);
-    next_next_angle = deg2rad((slot_idx + 2) * slot_pitch_deg);
+    slot_center_deg = slot_idx * slot_pitch_deg;
+    slot_start_deg = slot_center_deg - slot_arc_deg / 2;
+    slot_end_deg = slot_center_deg + slot_arc_deg / 2;
+    tooth_start_deg = slot_end_deg;
+    tooth_end_deg = slot_start_deg + slot_pitch_deg;
 
-    if mod(slot_idx, 2) == 1
-        p1x = stator_inner_radius * cos(prev_angle - tooth_half_angle);
-        p1y = stator_inner_radius * sin(prev_angle - tooth_half_angle);
-        p2x = stator_inner_radius * cos(curr_angle + tooth_half_angle);
-        p2y = stator_inner_radius * sin(curr_angle + tooth_half_angle);
-        p3x = tooth_tip_radius * cos(prev_angle - tooth_half_angle);
-        p3y = tooth_tip_radius * sin(prev_angle - tooth_half_angle);
-        p4x = tooth_tip_radius * cos(curr_angle + tooth_half_angle);
-        p4y = tooth_tip_radius * sin(curr_angle + tooth_half_angle);
-        p5x = tooth_shoulder_radius * cos(prev_angle);
-        p5y = tooth_shoulder_radius * sin(prev_angle);
-        p6x = tooth_shoulder_radius * cos(curr_angle);
-        p6y = tooth_shoulder_radius * sin(curr_angle);
-        p7x = slot_outer_radius * cos(curr_angle - arc_offset);
-        p7y = slot_outer_radius * sin(curr_angle - arc_offset);
+    slot_start_rad = deg2rad(slot_start_deg);
+    slot_end_rad = deg2rad(slot_end_deg);
+    tooth_start_rad = deg2rad(tooth_start_deg);
+    tooth_end_rad = deg2rad(tooth_end_deg);
 
-        mi_drawarc(p1x,p1y,p2x,p2y,slot_pitch_deg + rad2deg(2 * tooth_half_angle),max_segment);
-        mi_drawline(p1x,p1y,p3x,p3y);
-        mi_drawline(p2x,p2y,p4x,p4y);
-        mi_drawline(p3x,p3y,p5x,p5y);
-        mi_drawline(p4x,p4y,p6x,p6y);
-        mi_drawline(p6x,p6y,p7x,p7y);
-    else
-        p1x = slot_outer_radius * cos(next_angle - arc_offset);
-        p1y = slot_outer_radius * sin(next_angle - arc_offset);
-        p2x = slot_outer_radius * cos(next_next_angle + arc_offset);
-        p2y = slot_outer_radius * sin(next_next_angle + arc_offset);
-        p3x = stator_inner_radius * cos(prev_angle + tooth_half_angle);
-        p3y = stator_inner_radius * sin(prev_angle + tooth_half_angle);
-        p4x = stator_inner_radius * cos(curr_angle - tooth_half_angle);
-        p4y = stator_inner_radius * sin(curr_angle - tooth_half_angle);
-        p5x = tooth_shoulder_radius * cos(curr_angle);
-        p5y = tooth_shoulder_radius * sin(curr_angle);
-        p6x = slot_outer_radius * cos(curr_angle + arc_offset);
-        p6y = slot_outer_radius * sin(curr_angle + arc_offset);
+    slot_inner_start_x = stator_inner_radius * cos(slot_start_rad);
+    slot_inner_start_y = stator_inner_radius * sin(slot_start_rad);
+    slot_inner_end_x = stator_inner_radius * cos(slot_end_rad);
+    slot_inner_end_y = stator_inner_radius * sin(slot_end_rad);
+    slot_outer_start_x = slot_outer_radius * cos(slot_start_rad);
+    slot_outer_start_y = slot_outer_radius * sin(slot_start_rad);
+    slot_outer_end_x = slot_outer_radius * cos(slot_end_rad);
+    slot_outer_end_y = slot_outer_radius * sin(slot_end_rad);
 
-        mi_drawarc(p1x,p1y,p2x,p2y,180,max_segment);
-        mi_drawarc(p3x,p3y,p4x,p4y,slot_pitch_deg - rad2deg(2 * tooth_half_angle),max_segment);
-        mi_drawline(p5x,p5y,p6x,p6y);
-    end
+    mi_drawline(slot_inner_start_x,slot_inner_start_y,slot_outer_start_x,slot_outer_start_y);
+    mi_drawline(slot_inner_end_x,slot_inner_end_y,slot_outer_end_x,slot_outer_end_y);
+    mi_drawarc(slot_outer_start_x,slot_outer_start_y,slot_outer_end_x,slot_outer_end_y,slot_arc_deg,max_segment);
+
+    tooth_start_x = stator_inner_radius * cos(tooth_start_rad);
+    tooth_start_y = stator_inner_radius * sin(tooth_start_rad);
+    tooth_end_x = stator_inner_radius * cos(tooth_end_rad);
+    tooth_end_y = stator_inner_radius * sin(tooth_end_rad);
+    mi_drawarc(tooth_start_x,tooth_start_y,tooth_end_x,tooth_end_y,tooth_arc_deg,max_segment);
+
+    slot_label_angle = deg2rad(slot_center_deg);
+    slot_label_x = slot_label_radius * cos(slot_label_angle);
+    slot_label_y = slot_label_radius * sin(slot_label_angle);
+    mi_addblocklabel(slot_label_x,slot_label_y);
+    mi_selectlabel(slot_label_x,slot_label_y);
+    mi_setblockprop(Coil,1,0,Coilname{slot_idx + 1},0,2,turns);
+    mi_clearselected;
 end
 
 % Stator and air labels
@@ -230,41 +220,14 @@ mi_selectlabel(stator_outer_radius + 10,0);
 mi_setblockprop('Air',1,0,0,0,2,0);
 mi_clearselected;
 
-% Distributed winding labels
-coil_radius = slot_outer_radius;
-coil_phase_offsets = [-pi / 3, 0, pi / 3, 2 * pi / 3, pi, 4 * pi / 3];
-coil_phase_names = {Coilname{3}, Coilname{1}, Coilname{2}, ...
-                    Coilname{3}, Coilname{1}, Coilname{2}};
-coil_turn_signs = [-1, 1, 1, 1, -1, -1];
-
+% Commutation-ready circuit properties for A/B/C phases.
 for phase_idx = 1:numel(Coilname)
     mi_addcircprop(Coilname{phase_idx},0,1);
 end
 
-for sector_idx = 1:3
-    base_left_angle = deg2rad((2 * sector_idx - 1) * slot_pitch_deg);
-    base_right_angle = deg2rad((2 * sector_idx + 1) * slot_pitch_deg);
-
-    for coil_idx = 1:numel(coil_phase_offsets)
-        left_x = coil_radius * cos(base_left_angle + coil_phase_offsets(coil_idx));
-        left_y = coil_radius * sin(base_left_angle + coil_phase_offsets(coil_idx));
-        right_x = coil_radius * cos(base_right_angle + coil_phase_offsets(coil_idx));
-        right_y = coil_radius * sin(base_right_angle + coil_phase_offsets(coil_idx));
-
-        label_x = (left_x + right_x) / 2;
-        label_y = (left_y + right_y) / 2;
-
-        mi_addblocklabel(label_x,label_y);
-        mi_selectlabel(label_x,label_y);
-        mi_setblockprop(Coil,1,0,coil_phase_names{coil_idx},0,2,coil_turn_signs(coil_idx) * turns);
-        mi_clearselected;
-    end
-end
-
 % Boundary and save
 mi_makeABC(7,stator_outer_radius * 1.2,0,0,0);
-filename = fullfile(output_dir, 'v_ipm_motor.fem');
+filename = fullfile(output_dir, 'v_ipm_motor_4p3s.fem');
 mi_saveas(filename);
 
 % This file currently generates geometry only.
-% Analysis steps can be added later following the Ironcore.m workflow.
