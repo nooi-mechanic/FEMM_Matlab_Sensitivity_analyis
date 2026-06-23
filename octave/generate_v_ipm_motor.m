@@ -103,11 +103,12 @@ magnet_specs = [];
 
 for pole_idx = 1:numel(pole_axes_deg)
     pole_axis_deg = pole_axes_deg(pole_idx) + rotor_mech_angle_deg;
+    pole_magnetization_deg = mod(90 - pole_axis_deg, 360);
 
     magnet_specs = [
         magnet_specs;
-        pole_axis_deg + magnet_center_offset_deg, magnet_center_r, pole_axis_deg + v_angle_deg, pole_axis_deg + v_angle_deg;
-        pole_axis_deg - magnet_center_offset_deg, magnet_center_r, pole_axis_deg - v_angle_deg, pole_axis_deg - v_angle_deg
+        pole_axis_deg + magnet_center_offset_deg, magnet_center_r, pole_axis_deg + v_angle_deg, pole_magnetization_deg;
+        pole_axis_deg - magnet_center_offset_deg, magnet_center_r, pole_axis_deg - v_angle_deg, pole_magnetization_deg
     ];
 end
 
