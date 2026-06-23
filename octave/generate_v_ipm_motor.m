@@ -87,6 +87,12 @@ if ~exist(output_dir, 'dir')
     mkdir(output_dir);
 end
 
+% 해석 설정
+run_theta_sweep = true;
+theta_deg_vals = 0:1:359;
+Imax = 0; % 무부하 검증 기본값
+pole_pairs = 2;
+
 %% 회전자 (V-IPM)
 % 로터 외곽
 mi_drawarc(PM_r+Seal,0,-PM_r-Seal,0,180,max_segment);
@@ -161,6 +167,11 @@ mi_clearselected;
 mi_addblocklabel(0,0);
 mi_selectlabel(0,0);
 mi_setblockprop('Air',1,0,0,0,1,0);
+mi_clearselected;
+
+% 회전자 전체를 그룹 1로 묶어 각도 스윕 시 한 번에 회전시킨다.
+mi_selectcircle(0,0,PM_r+Seal+1,4);
+mi_setgroup(1);
 mi_clearselected;
 
 %% 고정자 외곽
@@ -249,4 +260,55 @@ end
 
 % 경계조건 및 저장
 mi_makeABC(7,PM_r*20,0,0,0);
-mi_saveas(fullfile(output_dir,'v_ipm_motor.fem'));
+base_fem_filename = fullfile(output_dir,'v_ipm_motor_base.fem');
+mi_saveas(base_fem_filename);
+
+%% Theta sweep analyze
+if run_theta_sweep
+    torque = zeros(size(theta_deg_vals));
+    F_x = zeros(size(theta_deg_vals));
+    F_y = zeros(size(theta_deg_vals));
+    Ia_hist = zeros(size(theta_deg_vals));
+    Ib_hist = zeros(size(theta_deg_vals));
+    Ic_hist = zeros(size(theta_deg_vals));
+
+    for theta_idx = 1:numel(theta_deg_vals)
+        theta_deg = theta_deg_vals(theta_idx);
+        fem_filename = fullfile(output_dir, sprintf('v_ipm_motor_%03ddeg.fem', theta_deg));
+
+        opendocument(base_fem_filename);
+
+        mi_selectgroup(1);
+        mi_moverotate2(0,0,theta_deg,4);
+        mi_clearselected;
+
+        theta_elec_rad = deg2rad(pole_pairs * theta_deg);
+        Ia = -Imax * sin(theta_elec_rad);
+        Ib = -Imax * sin(theta_elec_rad - 2*pi/3);
+        Ic = -Imax * sin(theta_elec_rad + 2*pi/3);
+
+        Ia_hist(theta_idx) = Ia;
+        Ib_hist(theta_idx) = Ib;
+        Ic_hist(theta_idx) = Ic;
+
+        mi_setcurrent(Coilname{1}, Ia);
+        mi_setcurrent(Coilname{2}, Ib);
+        mi_setcurrent(Coilname{3}, Ic);
+
+        mi_saveas(fem_filename);
+        mi_analyze;
+        mi_loadsolution;
+
+        mo_groupselectblock(1);
+        torque(theta_idx) = mo_blockintegral(22);
+        F_x(theta_idx) = mo_blockintegral(18);
+        F_y(theta_idx) = mo_blockintegral(19);
+        mo_clearblock;
+        mo_close;
+        mi_close;
+    end
+
+    save(fullfile(output_dir,'v_ipm_theta_sweep.mat'), ...
+        'theta_deg_vals', 'torque', 'F_x', 'F_y', ...
+        'Ia_hist', 'Ib_hist', 'Ic_hist', 'Imax', 'pole_pairs');
+end
