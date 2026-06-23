@@ -92,12 +92,13 @@ Teeth_length2 = 1;
 Arc_offset = 0.01*pi;
 
 % V형 IPM 로터 파라미터
-shaft_r = 12;
-magnet_length = 18;
+shaft_r = 8;
+magnet_length = 15;
 magnet_thickness = 4;
-v_angle_deg = 30;
+v_angle_deg = 45;
 magnet_center_r = PM_r - 6;
-magnet_center_offset_deg = 18;
+magnet_center_offset_deg = 20;
+rotor_mech_angle_deg = 0;
 
 % 출력 폴더
 output_dir = fullfile(pwd, 'femm_output_v_ipm');
@@ -114,13 +115,20 @@ mi_drawarc(-PM_r-Seal,0,PM_r+Seal,0,180,max_segment);
 mi_drawarc(shaft_r,0,-shaft_r,0,180,max_segment);
 mi_addarc(-shaft_r,0,shaft_r,0,180,max_segment);
 
-% V형 자석 4개 배치
-magnet_specs = [
-    90 + magnet_center_offset_deg,  magnet_center_r,  90 + v_angle_deg,  90 + v_angle_deg;
-    90 - magnet_center_offset_deg,  magnet_center_r,  90 - v_angle_deg,  90 - v_angle_deg;
-    270 - magnet_center_offset_deg, magnet_center_r, 270 - v_angle_deg, 270 - v_angle_deg;
-    270 + magnet_center_offset_deg, magnet_center_r, 270 + v_angle_deg, 270 + v_angle_deg
-];
+% V형 자석 8개 배치
+% rotor_mech_angle_deg를 더해 로터 형상과 자화 방향이 함께 회전하도록 한다.
+pole_axes_deg = [0, 90, 180, 270];
+magnet_specs = [];
+
+for pole_idx = 1:numel(pole_axes_deg)
+    pole_axis_deg = pole_axes_deg(pole_idx) + rotor_mech_angle_deg;
+
+    magnet_specs = [
+        magnet_specs;
+        pole_axis_deg + magnet_center_offset_deg, magnet_center_r, pole_axis_deg + v_angle_deg, pole_axis_deg + v_angle_deg;
+        pole_axis_deg - magnet_center_offset_deg, magnet_center_r, pole_axis_deg - v_angle_deg, pole_axis_deg - v_angle_deg
+    ];
+end
 
 for i = 1:size(magnet_specs,1)
     center_angle_deg = magnet_specs(i,1);
