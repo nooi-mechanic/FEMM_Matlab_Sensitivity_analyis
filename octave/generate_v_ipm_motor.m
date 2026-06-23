@@ -46,7 +46,7 @@ mi_addmaterial('Inconel 718', ...
     0);
 
 % 재료 정의
-PM = 'NdFeB 40 MGOe';
+PM = 'N35';
 Core = 'SiSteel';
 Sealing = 'Inconel 718';
 Coil = '18 AWG';
@@ -103,7 +103,7 @@ magnet_specs = [];
 
 for pole_idx = 1:numel(pole_axes_deg)
     pole_axis_deg = pole_axes_deg(pole_idx) + rotor_mech_angle_deg;
-    pole_magnetization_deg = mod(90 - pole_axis_deg, 360);
+    pole_magnetization_deg = mod(180 - pole_axis_deg, 360);
 
     magnet_specs = [
         magnet_specs;
